@@ -73,15 +73,26 @@ canvas{
   font-size:14px;
 }
 
+/* ---------- Credits ---------- */
 #credits{
   position:absolute;
   top:6px;
   right:8px;
   color:#0ff;
-  font-size:12px;
-  font-weight:bold;
+  text-align:center;
   user-select:none;
   text-shadow:0 0 4px #0ff;
+  line-height:1.1;
+}
+
+#credits .line1{
+  font-size:11px;
+  font-weight:bold;
+}
+
+#credits .line2{
+  font-size:10px; /* Alt satır daha küçük */
+  font-weight:normal;
 }
 </style>
 </head>
@@ -89,7 +100,10 @@ canvas{
 
 <div id="frame">
   <canvas id="game"></canvas>
-  <div id="credits">MAT Games by gokhantaylan</div>
+  <div id="credits">
+    <div class="line1">MAT GAMES</div>
+    <div class="line2">gokhantaylan</div>
+  </div>
 </div>
 
 <div id="controls">

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Pixel Tetris</title>
+<title>Pixel Tetris Neon</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
@@ -16,22 +16,43 @@ html,body{
   overflow:hidden;
   touch-action:none;
   font-family:monospace;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  height:100vh;
 }
+
+#frame{
+  display:inline-block;
+  padding:14px;
+  border-radius:18px;
+  background:#000;
+  animation: rgbGlow 6s linear infinite;
+}
+
+@keyframes rgbGlow{
+  0%{ box-shadow:0 0 20px #f0f, 0 0 40px #f0f; }
+  33%{ box-shadow:0 0 20px #0ff, 0 0 40px #0ff; }
+  66%{ box-shadow:0 0 20px #0f0, 0 0 40px #0f0; }
+  100%{ box-shadow:0 0 20px #f0f, 0 0 40px #f0f; }
+}
+
 canvas{
   display:block;
-  margin:auto;
   background:#111;
   image-rendering:pixelated;
+  border-radius:10px;
 }
+
 #controls{
-  position:fixed;
-  bottom:8px;
-  width:100%;
+  margin-top:12px;
   display:flex;
   justify-content:center;
   flex-wrap:wrap;
   gap:6px;
 }
+
 .btn{
   width:58px;
   height:58px;
@@ -44,6 +65,7 @@ canvas{
   font-size:22px;
   user-select:none;
 }
+
 .small{
   width:46px;
   height:46px;
@@ -53,7 +75,9 @@ canvas{
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<div id="frame">
+  <canvas id="game"></canvas>
+</div>
 
 <div id="controls">
   <div class="btn" id="left">◀</div>
@@ -66,9 +90,7 @@ canvas{
 </div>
 
 <script>
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js");
-}
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 
 // ---------- CANVAS ----------
 const canvas = document.getElementById("game");
@@ -86,16 +108,14 @@ function beep(freq,dur){
   if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
   const o=audioCtx.createOscillator();
   const g=audioCtx.createGain();
-  o.type="square";
-  o.frequency.value=freq;
-  o.connect(g);
-  g.connect(audioCtx.destination);
+  o.type="square"; o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
   o.start();
   g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
   o.stop(audioCtx.currentTime+dur);
 }
 
-// NES'e yakın basit loop
+// NES benzeri basit loop
 const melody=[659,494,523,587,523,494,440];
 let noteIndex=0;
 
@@ -103,7 +123,6 @@ function startMusic(){
   if(!musicOn) return;
   if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
   if(musicOsc) return;
-
   musicOsc = audioCtx.createOscillator();
   musicGain = audioCtx.createGain();
   musicOsc.type="square";
@@ -111,7 +130,6 @@ function startMusic(){
   musicOsc.connect(musicGain);
   musicGain.connect(audioCtx.destination);
   musicOsc.start();
-
   musicTimer = setInterval(()=>{
     musicOsc.frequency.value = melody[noteIndex++ % melody.length];
   },300);

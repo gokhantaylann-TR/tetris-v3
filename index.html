@@ -1,241 +1,359 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAT GAMES | Street Racing Edition</title>
-    <style>
-        body { 
-            margin: 0; background: #0a0a0a; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            height: 100vh; font-family: 'Courier New', monospace; color: white; 
-            overflow: hidden; touch-action: manipulation;
-        }
-        .game-wrapper { position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
-        canvas { border: 4px solid #222; background: #333; display: block; image-rendering: pixelated; }
-        
-        .ui { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; text-shadow: 2px 2px #000; z-index: 10; }
-        .brand { position: absolute; top: 15px; right: 20px; text-align: right; z-index: 10;}
-        .brand .title { font-size: 16px; font-weight: bold; color: #3498db; font-style: italic; }
-        .brand .author { font-size: 11px; opacity: 0.9; color: #ecf0f1; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pixel Tetris Neon</title>
 
-        .controls { display: flex; justify-content: space-between; width: 400px; margin-top: 20px; gap: 20px; }
-        .btn-group { display: flex; gap: 10px; }
-        .btn { 
-            width: 70px; height: 70px; background: #222; border: 3px solid #555; 
-            color: white; display: flex; align-items: center; justify-content: center; 
-            font-size: 28px; cursor: pointer; user-select: none; border-radius: 8px;
-            box-shadow: 0 4px #111;
-        }
-        .btn:active { background: #3498db; transform: translateY(4px); box-shadow: 0 0 #111; }
-        
-        #msg { 
-            background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 4px; 
-            margin-top: 10px; cursor: pointer; pointer-events: auto; border: 2px solid #3498db;
-            font-weight: bold; letter-spacing: 1px;
-        }
-    </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  overflow:hidden;
+  touch-action:none;
+  font-family:monospace;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  height:100vh;
+}
+
+#frame{
+  display:inline-block;
+  padding:14px;
+  border-radius:18px;
+  background:#000;
+  animation: rgbGlow 6s linear infinite;
+  position:relative;
+}
+
+@keyframes rgbGlow{
+  0%{ box-shadow:0 0 20px #f0f, 0 0 40px #f0f; }
+  33%{ box-shadow:0 0 20px #0ff, 0 0 40px #0ff; }
+  66%{ box-shadow:0 0 20px #0f0, 0 0 40px #0f0; }
+  100%{ box-shadow:0 0 20px #f0f, 0 0 40px #f0f; }
+}
+
+canvas{
+  display:block;
+  background:#111;
+  image-rendering:pixelated;
+  border-radius:10px;
+}
+
+#controls{
+  margin-top:12px;
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.btn{
+  width:58px;
+  height:58px;
+  background:#333;
+  color:#fff;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  user-select:none;
+}
+
+.small{
+  width:46px;
+  height:46px;
+  font-size:14px;
+}
+
+/* ---------- Credits ---------- */
+#credits{
+  position:absolute;
+  top:6px;
+  right:8px;
+  color:#0ff;
+  text-align:center;
+  user-select:none;
+  text-shadow:0 0 4px #0ff;
+  line-height:1.1;
+}
+
+#credits .line1{
+  font-size:11px;
+  font-weight:bold;
+}
+
+#credits .line2{
+  font-size:10px; /* Alt satır daha küçük */
+  font-weight:normal;
+}
+</style>
 </head>
 <body>
 
-    <div class="game-wrapper">
-        <div class="ui">
-            <h2 id="score">SKOR: 0</h2>
-            <div id="msg" onclick="startGame()">YARIŞA BAŞLA</div>
-        </div>
-        <div class="brand">
-            <div class="title">MAT STREET RACING</div>
-            <div class="author">gokhantaylan</div>
-        </div>
-        <canvas id="gameCanvas" width="400" height="500"></canvas>
-    </div>
+<div id="frame">
+  <canvas id="game"></canvas>
+  <div id="credits">
+    <div class="line1">MAT GAMES</div>
+    <div class="line2">gokhantaylan</div>
+  </div>
+</div>
 
-    <div class="controls">
-        <div class="btn-group">
-            <div class="btn" id="btnLeft">◀</div>
-            <div class="btn" id="btnRight">▶</div>
-        </div>
-        <div class="btn" id="btnPause">P</div>
-    </div>
+<div id="controls">
+  <div class="btn" id="left">◀</div>
+  <div class="btn" id="rotate">⟳</div>
+  <div class="btn" id="right">▶</div>
+  <div class="btn" id="down">▼</div>
+  <div class="btn small" id="pause">⏸</div>
+  <div class="btn small" id="restart">⟲</div>
+  <div class="btn small" id="music">🎵</div>
+</div>
 
 <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const scoreElement = document.getElementById("score");
-    const msgElement = document.getElementById("msg");
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 
-    let gameRunning = false, paused = false, score = 0, speed = 8, frame = 0;
-    const ROAD_WIDTH = 280, LANES = 3, LANE_W = ROAD_WIDTH / LANES;
+// ---------- CANVAS ----------
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const COLS=10, ROWS=20, BLOCK=24;
+canvas.width = COLS*BLOCK;
+canvas.height = ROWS*BLOCK;
 
-    // Araba Modelleri
-    const MODELS = { SKYLINE: 'skyline', CHARGER: 'charger', SUPRA: 'supra', S2000: 's2000' };
+// ---------- AUDIO ----------
+let audioCtx;
+let musicOsc=null, musicGain=null, musicTimer=null;
+let musicOn = true;
 
-    // Oyuncu: Nissan Skyline GT-R R34 (Gümüş/Mavi)
-    const player = { lane: 1, targetX: 0, currentX: 0, y: 380, w: 42, h: 76, model: MODELS.SKYLINE, color: "#bdc3c7" };
-    let enemies = [];
+function beep(freq,dur){
+  if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type="square"; o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
+}
 
-    // Rakipler: F&F İkonları
-    const enemyTypes = [
-        { model: MODELS.CHARGER, color: "#111" }, // Dom
-        { model: MODELS.SUPRA, color: "#e67e22" }, // Brian Orange
-        { model: MODELS.S2000, color: "#fd79a8" } // Suki Pink
-    ];
+// NES benzeri basit loop
+const melody=[659,494,523,587,523,494,440];
+let noteIndex=0;
 
-    // --- SES MOTORU ---
-    let audioCtx, oscillator, gainNode;
-    function initEngineSound() {
-        try {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            oscillator = audioCtx.createOscillator();
-            gainNode = audioCtx.createGain();
-            oscillator.type = 'sawtooth';
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            gainNode.gain.value = 0.03; 
-            oscillator.start();
-        } catch(e) {}
+function startMusic(){
+  if(!musicOn) return;
+  if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
+  if(musicOsc) return;
+  musicOsc = audioCtx.createOscillator();
+  musicGain = audioCtx.createGain();
+  musicOsc.type="square";
+  musicGain.gain.value=0.03;
+  musicOsc.connect(musicGain);
+  musicGain.connect(audioCtx.destination);
+  musicOsc.start();
+  musicTimer = setInterval(()=>{
+    musicOsc.frequency.value = melody[noteIndex++ % melody.length];
+  },300);
+}
+
+function stopMusic(){
+  if(musicOsc){
+    musicOsc.stop();
+    musicOsc=null;
+  }
+  clearInterval(musicTimer);
+}
+
+// ---------- GAME STATE ----------
+let grid, score, lines, level, high;
+let paused=false, gameOver=false;
+
+const PIECES=[
+  {s:[[1,1,1,1]],c:"cyan"},
+  {s:[[2,2],[2,2]],c:"yellow"},
+  {s:[[0,3,0],[3,3,3]],c:"purple"},
+  {s:[[0,4,4],[4,4,0]],c:"green"},
+  {s:[[5,5,0],[0,5,5]],c:"red"},
+  {s:[[6,0,0],[6,6,6]],c:"blue"},
+  {s:[[0,0,7],[7,7,7]],c:"orange"}
+];
+
+function newPiece(){
+  const p=PIECES[Math.floor(Math.random()*PIECES.length)];
+  return {x:3,y:0,shape:p.s,color:p.c};
+}
+
+let cur, next;
+let dropCounter=0, dropInterval=700, last=0;
+
+// ---------- RESET ----------
+function resetGame(){
+  grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  score = 0;
+  lines = 0;
+  level = 1;
+  high = localStorage.high || 0;
+  cur = newPiece();
+  next = newPiece();
+  paused = false;
+  gameOver = false;
+  dropInterval = 700;
+  dropCounter = 0;
+  last = 0;
+}
+
+// ---------- DRAW ----------
+function drawBlock(x,y,c,a=1){
+  ctx.globalAlpha=a;
+  ctx.fillStyle=c;
+  ctx.fillRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
+  ctx.strokeStyle="#111";
+  ctx.strokeRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
+  ctx.globalAlpha=1;
+}
+
+function collide(p){
+  return p.shape.some((r,y)=>r.some((v,x)=>{
+    if(!v) return false;
+    let nx=p.x+x, ny=p.y+y;
+    return ny>=ROWS||nx<0||nx>=COLS||grid[ny][nx];
+  }));
+}
+
+function ghostY(){
+  let y=cur.y;
+  while(!collide({...cur,y:y+1})) y++;
+  return y;
+}
+
+function draw(){
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  grid.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(x,y,v)));
+
+  const gy=ghostY();
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,gy+y,cur.color,0.3)));
+
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,cur.y+y,cur.color)));
+
+  ctx.fillStyle="#fff";
+  ctx.fillText(`SKOR: ${score}`,10,20);
+  ctx.fillText(`SEVİYE: ${level}`,10,40);
+  ctx.fillText(`REKOR: ${high}`,10,60);
+
+  if(paused) ctx.fillText("PAUSE",10,90);
+  if(gameOver) ctx.fillText("GAME OVER",10,90);
+}
+
+// ---------- LOGIC ----------
+function merge(){
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>{
+    if(v) grid[cur.y+y][cur.x+x]=cur.color;
+  }));
+  beep(300,0.05);
+}
+
+function rotate(){
+  const old=cur.shape;
+  const rows=old.length, cols=old[0].length;
+  let res=[];
+  for(let c=0;c<cols;c++){
+    res[c]=[];
+    for(let r=rows-1;r>=0;r--) res[c].push(old[r][c]);
+  }
+  cur.shape=res;
+  if(collide(cur)) cur.shape=old;
+  else beep(700,0.05);
+}
+
+function clearLines(){
+  let cleared=0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(grid[y].every(v=>v)){
+      grid.splice(y,1);
+      grid.unshift(Array(COLS).fill(0));
+      cleared++; y++;
     }
-    function updateEnginePitch() {
-        if (oscillator && !paused && gameRunning) {
-            oscillator.frequency.setTargetAtTime(50 + (speed * 5), audioCtx.currentTime, 0.1);
-            gainNode.gain.setTargetAtTime(0.03, audioCtx.currentTime, 0.1);
-        } else if (gainNode) gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+  }
+  if(cleared){
+    lines+=cleared;
+    score+=cleared*10*level;
+    level=1+Math.floor(lines/10);
+    dropInterval=Math.max(150,700-level*70);
+    high=Math.max(high,score);
+    localStorage.high=high;
+    beep(500,0.1);
+  }
+}
+
+function drop(){
+  cur.y++;
+  if(collide(cur)){
+    cur.y--;
+    merge();
+    clearLines();
+    cur=next;
+    next=newPiece();
+    if(collide(cur)) gameOver=true;
+  }
+}
+
+// ---------- CONTROLS ----------
+["left","right","down","rotate","pause","restart","music"].forEach(id=>{
+  document.getElementById(id).ontouchstart=()=>{
+    audioCtx?.resume();
+    if(id!=="music") startMusic();
+
+    if(id==="left"){cur.x--; if(collide(cur)) cur.x++;}
+    if(id==="right"){cur.x++; if(collide(cur)) cur.x--;}
+    if(id==="down") drop();
+    if(id==="rotate") rotate();
+
+    if(id==="pause"){
+      paused=!paused;
+      paused ? stopMusic() : startMusic();
     }
 
-    // --- KONTROLLER ---
-    window.addEventListener("keydown", e => {
-        if (!gameRunning) return;
-        if (e.code === "KeyP") togglePause();
-        if (!paused) {
-            if (e.code === "ArrowLeft" && player.lane > 0) player.lane--;
-            if (e.code === "ArrowRight" && player.lane < LANES - 1) player.lane++;
-        }
-    });
-    function setupBtn(id, action) {
-        const btn = document.getElementById(id);
-        const handle = (e) => { e.preventDefault(); action(); };
-        btn.addEventListener("mousedown", handle); btn.addEventListener("touchstart", handle);
-    }
-    setupBtn("btnLeft", () => { if(gameRunning && !paused && player.lane > 0) player.lane--; });
-    setupBtn("btnRight", () => { if(gameRunning && !paused && player.lane < LANES - 1) player.lane++; });
-    setupBtn("btnPause", () => { if(gameRunning) togglePause(); });
-
-    function togglePause() { paused = !paused; msgElement.style.display = paused ? "block" : "none"; msgElement.innerText = "PAUSED"; }
-    function startGame() { if (!gameRunning) { if(!audioCtx) initEngineSound(); resetGame(); gameRunning = true; update(); } else if (paused) { paused = false; msgElement.style.display = "none"; }}
-    function resetGame() { score = 0; speed = 8; frame = 0; enemies = []; player.lane = 1; player.currentX = getLaneX(1); player.targetX = player.currentX; paused = false; msgElement.style.display = "none"; scoreElement.innerText = "SKOR: 0"; }
-    function getLaneX(lane) { return (canvas.width / 2 - ROAD_WIDTH / 2) + (lane * LANE_W) + (LANE_W / 2 - player.w / 2); }
-
-    // --- GELİŞMİŞ ARABA ÇİZİMİ (PIXEL ART) ---
-    function drawCar(car) {
-        const { x, y, w, h, model, color } = car;
-        ctx.fillStyle = color;
-
-        // Temel Gövde (Tüm araçlar için)
-        ctx.fillRect(x+2, y, w-4, h-2); // Ana gövde
-        ctx.fillStyle = "rgba(0,0,0,0.3)"; // Yan gölgeler
-        ctx.fillRect(x, y+5, 2, h-10); ctx.fillRect(x+w-2, y+5, 2, h-10);
-
-        // Tekerlekler
-        ctx.fillStyle = "#111";
-        [10, h-18].forEach(wy => { ctx.fillRect(x, y+wy, 3, 12); ctx.fillRect(x+w-3, y+wy, 3, 12); });
-
-        // Modele Özel Detaylar
-        switch(model) {
-            case MODELS.SKYLINE: // R34
-                // Mavi Şeritler
-                ctx.fillStyle = "#3498db";
-                ctx.fillRect(x+10, y, 4, h-5); ctx.fillRect(x+w-14, y, 4, h-5);
-                // Cam
-                ctx.fillStyle = "#8e44ad"; ctx.fillRect(x+4, y+18, w-8, 16);
-                // Rüzgarlık (Kutulu)
-                ctx.fillStyle = "#111"; ctx.fillRect(x+2, y+h-8, w-4, 6);
-                // Stoplar (4 yuvarlak kırmızı)
-                ctx.fillStyle = "#e74c3c";
-                ctx.fillRect(x+6, y+h-4, 4, 3); ctx.fillRect(x+12, y+h-4, 4, 3);
-                ctx.fillRect(x+w-16, y+h-4, 4, 3); ctx.fillRect(x+w-10, y+h-4, 4, 3);
-                break;
-
-            case MODELS.CHARGER: // Dom's Muscle Car
-                // Cam (Daha dar)
-                ctx.fillStyle = "#333"; ctx.fillRect(x+5, y+22, w-10, 12);
-                // Motor Blower (Kaput üstü çıkıntı)
-                ctx.fillStyle = "#7f8c8d"; ctx.fillRect(x+w/2-6, y+8, 12, 14);
-                ctx.fillStyle = "#95a5a6"; ctx.fillRect(x+w/2-4, y+6, 8, 4); // Hava girişi
-                // Arka Stop (Tek parça kırmızı)
-                ctx.fillStyle = "#c0392b"; ctx.fillRect(x+4, y+h-5, w-8, 4);
-                break;
-
-            case MODELS.SUPRA: // Brian's Orange
-                // Cam (Kavisli hissi)
-                ctx.fillStyle = "#d35400"; ctx.fillRect(x+5, y+20, w-10, 15);
-                // Yan Grafikler (Siyah detay)
-                ctx.fillStyle = "#111"; ctx.fillRect(x+2, y+35, 3, 20); ctx.fillRect(x+w-5, y+35, 3, 20);
-                // Dev Rüzgarlık (Kavisli)
-                ctx.fillStyle = color; ctx.fillRect(x, y+h-10, w, 8);
-                ctx.fillStyle = "#111"; ctx.fillRect(x+4, y+h-8, w-8, 4); // Kanat altı
-                break;
-                
-            case MODELS.S2000: // Suki Pink Convertible
-                // Üstü Açık (Koyu iç mekan)
-                ctx.fillStyle = "#2c3e50"; ctx.fillRect(x+5, y+25, w-10, 18);
-                // Ön Cam Çerçevesi
-                ctx.fillStyle = "#fd79a8"; ctx.fillRect(x+5, y+22, w-10, 3);
-                // Küçük Rüzgarlık
-                ctx.fillStyle = "#e84393"; ctx.fillRect(x+4, y+h-6, w-8, 4);
-                break;
-        }
+    if(id==="restart"){
+      stopMusic();
+      resetGame();
     }
 
-    function drawRoad() {
-        ctx.fillStyle = "#2c3e50"; ctx.fillRect(0, 0, canvas.width, canvas.height); // Asfalt
-        const roadX = canvas.width / 2 - ROAD_WIDTH / 2;
-        // Yol Kenarları (Kırmızı-Beyaz Bordür)
-        const kerbSize = 15;
-        for(let i=-frame%kerbSize; i<canvas.height; i+=kerbSize){
-            ctx.fillStyle = (Math.floor((i+frame)/kerbSize)%2===0) ? "#e74c3c" : "#ecf0f1";
-            ctx.fillRect(roadX-kerbSize, i, kerbSize, kerbSize);
-            ctx.fillRect(roadX+ROAD_WIDTH, i, kerbSize, kerbSize);
-        }
-        // Şeritler
-        ctx.strokeStyle = "#bdc3c7"; ctx.setLineDash([40, 50]); ctx.lineDashOffset = -frame * speed * 1.5;
-        ctx.lineWidth = 3;
-        for (let i = 1; i < LANES; i++) {
-            ctx.beginPath(); ctx.moveTo(roadX + i * LANE_W, 0); ctx.lineTo(roadX + i * LANE_W, canvas.height); ctx.stroke();
-        }
+    if(id==="music"){
+      musicOn=!musicOn;
+      musicOn ? startMusic() : stopMusic();
+      document.getElementById("music").textContent = musicOn ? "🎵" : "🔇";
     }
+  };
+});
 
-    function update() {
-        if (!gameRunning || paused) { updateEnginePitch(); if(gameRunning) requestAnimationFrame(update); return; }
-        frame++; ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawRoad(); updateEnginePitch();
+// ---------- LOOP ----------
+function update(t=0){
+  if(paused||gameOver){
+    draw();
+    requestAnimationFrame(update);
+    return;
+  }
+  let d=t-last; last=t;
+  dropCounter+=d;
+  if(dropCounter>dropInterval){
+    drop();
+    dropCounter=0;
+  }
+  draw();
+  requestAnimationFrame(update);
+}
 
-        player.targetX = getLaneX(player.lane);
-        player.currentX += (player.targetX - player.currentX) * 0.18;
-        drawCar({ ...player, x: player.currentX });
-
-        if (frame % Math.max(20, 50 - Math.floor(speed*1.2)) === 0) {
-            const type = enemyTypes[Math.floor(Math.random()*enemyTypes.length)];
-            enemies.push({ lane: Math.floor(Math.random()*LANES), y: -100, w: 42, h: 76, model: type.model, color: type.color });
-        }
-
-        enemies.forEach((en, index) => {
-            en.y += speed;
-            en.x = getLaneX(en.lane);
-            drawCar(en);
-            // Çarpışma (Hitbox biraz daraltıldı)
-            if (player.currentX < en.x + en.w - 8 && player.currentX + player.w - 8 > en.x &&
-                player.y < en.y + en.h - 5 && player.y + player.h - 5 > en.y) { gameOver(); }
-            if (en.y > canvas.height) {
-                enemies.splice(index, 1); score++; scoreElement.innerText = `SKOR: ${score}`;
-                if (score % 8 === 0) speed += 0.3;
-            }
-        });
-        requestAnimationFrame(update);
-    }
-
-    function gameOver() { gameRunning = false; msgElement.style.display = "block"; msgElement.innerText = "KAZA! TEKRAR DENE"; }
-    drawRoad();
-    drawCar({ ...player, x: getLaneX(1) });
+// ---------- START ----------
+resetGame();
+update();
 </script>
 </body>
 </html>

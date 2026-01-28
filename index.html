@@ -25,15 +25,16 @@ canvas{
 }
 #controls{
   position:fixed;
-  bottom:10px;
+  bottom:8px;
   width:100%;
   display:flex;
-  justify-content:space-around;
+  justify-content:center;
   flex-wrap:wrap;
+  gap:6px;
 }
 .btn{
-  width:60px;
-  height:60px;
+  width:58px;
+  height:58px;
   background:#333;
   color:#fff;
   border-radius:50%;
@@ -42,9 +43,12 @@ canvas{
   justify-content:center;
   font-size:22px;
   user-select:none;
-  margin:4px;
 }
-.small{width:50px;height:50px;font-size:14px;}
+.small{
+  width:46px;
+  height:46px;
+  font-size:14px;
+}
 </style>
 </head>
 <body>
@@ -62,7 +66,9 @@ canvas{
 </div>
 
 <script>
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
 
 // ---------- CANVAS ----------
 const canvas = document.getElementById("game");
@@ -72,44 +78,55 @@ canvas.width = COLS*BLOCK;
 canvas.height = ROWS*BLOCK;
 
 // ---------- AUDIO ----------
-let audioCtx, musicOsc, musicGain, musicTimer;
-function beep(f,d){
+let audioCtx;
+let musicOsc=null, musicGain=null, musicTimer=null;
+let musicOn = true;
+
+function beep(freq,dur){
   if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
   const o=audioCtx.createOscillator();
   const g=audioCtx.createGain();
-  o.type="square"; o.frequency.value=f;
-  o.connect(g); g.connect(audioCtx.destination);
+  o.type="square";
+  o.frequency.value=freq;
+  o.connect(g);
+  g.connect(audioCtx.destination);
   o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d);
-  o.stop(audioCtx.currentTime+d);
+  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
 }
 
-// NES benzeri basit melodi
+// NES'e yakın basit loop
 const melody=[659,494,523,587,523,494,440];
-let note=0;
+let noteIndex=0;
+
 function startMusic(){
+  if(!musicOn) return;
   if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
   if(musicOsc) return;
-  musicOsc=audioCtx.createOscillator();
-  musicGain=audioCtx.createGain();
+
+  musicOsc = audioCtx.createOscillator();
+  musicGain = audioCtx.createGain();
   musicOsc.type="square";
   musicGain.gain.value=0.03;
   musicOsc.connect(musicGain);
   musicGain.connect(audioCtx.destination);
   musicOsc.start();
-  musicTimer=setInterval(()=>{
-    musicOsc.frequency.value=melody[note++%melody.length];
+
+  musicTimer = setInterval(()=>{
+    musicOsc.frequency.value = melody[noteIndex++ % melody.length];
   },300);
 }
+
 function stopMusic(){
-  if(musicOsc){musicOsc.stop(); musicOsc=null;}
+  if(musicOsc){
+    musicOsc.stop();
+    musicOsc=null;
+  }
   clearInterval(musicTimer);
 }
 
 // ---------- GAME STATE ----------
-let grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
-let score=0, lines=0, level=1;
-let high=localStorage.high||0;
+let grid, score, lines, level, high;
 let paused=false, gameOver=false;
 
 const PIECES=[
@@ -127,17 +144,41 @@ function newPiece(){
   return {x:3,y:0,shape:p.s,color:p.c};
 }
 
-let cur=newPiece(), next=newPiece();
+let cur, next;
 let dropCounter=0, dropInterval=700, last=0;
 
+// ---------- RESET ----------
+function resetGame(){
+  grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  score = 0;
+  lines = 0;
+  level = 1;
+  high = localStorage.high || 0;
+  cur = newPiece();
+  next = newPiece();
+  paused = false;
+  gameOver = false;
+  dropInterval = 700;
+  dropCounter = 0;
+  last = 0;
+}
+
 // ---------- DRAW ----------
-function drawBlock(x,y,c,alpha=1){
-  ctx.globalAlpha=alpha;
+function drawBlock(x,y,c,a=1){
+  ctx.globalAlpha=a;
   ctx.fillStyle=c;
   ctx.fillRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
   ctx.strokeStyle="#111";
   ctx.strokeRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
   ctx.globalAlpha=1;
+}
+
+function collide(p){
+  return p.shape.some((r,y)=>r.some((v,x)=>{
+    if(!v) return false;
+    let nx=p.x+x, ny=p.y+y;
+    return ny>=ROWS||nx<0||nx>=COLS||grid[ny][nx];
+  }));
 }
 
 function ghostY(){
@@ -152,30 +193,21 @@ function draw(){
 
   grid.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(x,y,v)));
 
-  // Ghost piece
   const gy=ghostY();
   cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,gy+y,cur.color,0.3)));
 
-  // Active piece
   cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,cur.y+y,cur.color)));
 
   ctx.fillStyle="#fff";
   ctx.fillText(`SKOR: ${score}`,10,20);
   ctx.fillText(`SEVİYE: ${level}`,10,40);
   ctx.fillText(`REKOR: ${high}`,10,60);
+
   if(paused) ctx.fillText("PAUSE",10,90);
   if(gameOver) ctx.fillText("GAME OVER",10,90);
 }
 
 // ---------- LOGIC ----------
-function collide(p){
-  return p.shape.some((r,y)=>r.some((v,x)=>{
-    if(!v) return false;
-    let nx=p.x+x, ny=p.y+y;
-    return ny>=ROWS||nx<0||nx>=COLS||grid[ny][nx];
-  }));
-}
-
 function merge(){
   cur.shape.forEach((r,y)=>r.forEach((v,x)=>{
     if(v) grid[cur.y+y][cur.x+x]=cur.color;
@@ -229,29 +261,53 @@ function drop(){
 }
 
 // ---------- CONTROLS ----------
-["left","right","down","rotate","pause","restart"].forEach(id=>{
+["left","right","down","rotate","pause","restart","music"].forEach(id=>{
   document.getElementById(id).ontouchstart=()=>{
     audioCtx?.resume();
-    startMusic();
+    if(id!=="music") startMusic();
+
     if(id==="left"){cur.x--; if(collide(cur)) cur.x++;}
     if(id==="right"){cur.x++; if(collide(cur)) cur.x--;}
     if(id==="down") drop();
     if(id==="rotate") rotate();
-    if(id==="pause"){paused=!paused; paused?stopMusic():startMusic();}
-    if(id==="restart") location.reload();
+
+    if(id==="pause"){
+      paused=!paused;
+      paused ? stopMusic() : startMusic();
+    }
+
+    if(id==="restart"){
+      stopMusic();
+      resetGame();
+    }
+
+    if(id==="music"){
+      musicOn=!musicOn;
+      musicOn ? startMusic() : stopMusic();
+      document.getElementById("music").textContent = musicOn ? "🎵" : "🔇";
+    }
   };
 });
 
 // ---------- LOOP ----------
 function update(t=0){
-  if(paused||gameOver){draw(); requestAnimationFrame(update); return;}
+  if(paused||gameOver){
+    draw();
+    requestAnimationFrame(update);
+    return;
+  }
   let d=t-last; last=t;
   dropCounter+=d;
-  if(dropCounter>dropInterval){drop(); dropCounter=0;}
+  if(dropCounter>dropInterval){
+    drop();
+    dropCounter=0;
+  }
   draw();
   requestAnimationFrame(update);
 }
 
+// ---------- START ----------
+resetGame();
 update();
 </script>
 </body>

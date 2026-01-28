@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pixel Tetris</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  overflow:hidden;
+  touch-action:none;
+  font-family:monospace;
+}
+canvas{
+  display:block;
+  margin:auto;
+  background:#111;
+  image-rendering:pixelated;
+}
+#controls{
+  position:fixed;
+  bottom:20px;
+  width:100%;
+  display:flex;
+  justify-content:space-around;
+}
+.btn{
+  width:60px;
+  height:60px;
+  background:#333;
+  color:#fff;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:24px;
+  user-select:none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="controls">
+  <div class="btn" id="left">◀</div>
+  <div class="btn" id="rotate">⟳</div>
+  <div class="btn" id="right">▶</div>
+  <div class="btn" id="down">▼</div>
+</div>
+
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+// ---------- CANVAS ----------
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const COLS = 10, ROWS = 20, BLOCK = 24;
+canvas.width = COLS * BLOCK;
+canvas.height = ROWS * BLOCK;
+
+// ---------- AUDIO ----------
+let audioCtx, musicOsc, musicGain;
+function beep(freq, dur){
+  if(!audioCtx) audioCtx = new (window.AudioContext||webkitAudioContext)();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type="square";
+  o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
+}
+
+function startMusic(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||webkitAudioContext)();
+  if(musicOsc) return;
+  musicOsc = audioCtx.createOscillator();
+  musicGain = audioCtx.createGain();
+  musicOsc.type="square";
+  musicGain.gain.value=0.025;
+  musicOsc.connect(musicGain);
+  musicGain.connect(audioCtx.destination);
+  musicOsc.start();
+  setInterval(()=>{
+    musicOsc.frequency.value = Math.random()>0.5 ? 220 : 330;
+  },300);
+}
+
+// ---------- GAME ----------
+let grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+let score = 0, high = localStorage.high||0, gameOver=false;
+
+const PIECES=[
+  {s:[[1,1,1,1]],c:"cyan"},
+  {s:[[2,2],[2,2]],c:"yellow"},
+  {s:[[0,3,0],[3,3,3]],c:"purple"},
+  {s:[[0,4,4],[4,4,0]],c:"green"},
+  {s:[[5,5,0],[0,5,5]],c:"red"},
+  {s:[[6,0,0],[6,6,6]],c:"blue"},
+  {s:[[0,0,7],[7,7,7]],c:"orange"}
+];
+
+function newPiece(){
+  const p = PIECES[Math.floor(Math.random()*PIECES.length)];
+  return {x:3,y:0,shape:p.s,color:p.c};
+}
+
+let cur = newPiece(), next = newPiece();
+let dropCounter=0, dropInterval=500, last=0;
+
+// ---------- DRAW ----------
+function drawBlock(x,y,c){
+  ctx.fillStyle=c;
+  ctx.fillRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
+  ctx.strokeStyle="#111";
+  ctx.strokeRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
+}
+
+function draw(){
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  grid.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(x,y,v)));
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,cur.y+y,cur.color)));
+  ctx.fillStyle="#fff";
+  ctx.fillText("SKOR: "+score,10,20);
+  ctx.fillText("REKOR: "+high,10,40);
+  if(gameOver) ctx.fillText("GAME OVER",10,70);
+}
+
+// ---------- LOGIC ----------
+function collide(p){
+  return p.shape.some((r,y)=>r.some((v,x)=>{
+    if(!v) return false;
+    let nx=p.x+x, ny=p.y+y;
+    return ny>=ROWS||nx<0||nx>=COLS||grid[ny][nx];
+  }));
+}
+
+function merge(){
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>{
+    if(v) grid[cur.y+y][cur.x+x]=cur.color;
+  }));
+  beep(300,0.05);
+}
+
+function rotate(){
+  const old = cur.shape;
+  const rows=old.length, cols=old[0].length;
+  let res=[];
+  for(let c=0;c<cols;c++){
+    res[c]=[];
+    for(let r=rows-1;r>=0;r--) res[c].push(old[r][c]);
+  }
+  cur.shape=res;
+  if(collide(cur)) cur.shape=old;
+  else beep(700,0.05);
+}
+
+function clearLines(){
+  let lines=0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(grid[y].every(v=>v)){
+      grid.splice(y,1);
+      grid.unshift(Array(COLS).fill(0));
+      lines++; y++;
+    }
+  }
+  if(lines){
+    score+=lines*10;
+    high=Math.max(high,score);
+    localStorage.high=high;
+    beep(500,0.1);
+  }
+}
+
+function drop(){
+  cur.y++;
+  if(collide(cur)){
+    cur.y--;
+    merge();
+    clearLines();
+    cur=next;
+    next=newPiece();
+    if(collide(cur)) gameOver=true;
+  }
+}
+
+// ---------- CONTROLS ----------
+["left","right","down","rotate"].forEach(id=>{
+  document.getElementById(id).ontouchstart=()=>{
+    audioCtx?.resume();
+    startMusic();
+    if(id==="left") cur.x--;
+    if(id==="right") cur.x++;
+    if(id==="down") drop();
+    if(id==="rotate") rotate();
+    if(collide(cur)&&id!=="rotate") cur.x += id==="left"?1:-1;
+  };
+});
+
+// ---------- LOOP ----------
+function update(t=0){
+  let d=t-last; last=t;
+  dropCounter+=d;
+  if(dropCounter>dropInterval){drop(); dropCounter=0;}
+  draw();
+  if(!gameOver) requestAnimationFrame(update);
+}
+
+update();
+</script>
+</body>
+</html>

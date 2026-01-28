@@ -29,6 +29,7 @@ html,body{
   border-radius:18px;
   background:#000;
   animation: rgbGlow 6s linear infinite;
+  position:relative;
 }
 
 @keyframes rgbGlow{
@@ -71,12 +72,24 @@ canvas{
   height:46px;
   font-size:14px;
 }
+
+#credits{
+  position:absolute;
+  top:6px;
+  right:8px;
+  color:#0ff;
+  font-size:12px;
+  font-weight:bold;
+  user-select:none;
+  text-shadow:0 0 4px #0ff;
+}
 </style>
 </head>
 <body>
 
 <div id="frame">
   <canvas id="game"></canvas>
+  <div id="credits">MAT Games by gokhantaylan</div>
 </div>
 
 <div id="controls">

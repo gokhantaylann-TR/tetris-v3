@@ -25,10 +25,11 @@ canvas{
 }
 #controls{
   position:fixed;
-  bottom:20px;
+  bottom:10px;
   width:100%;
   display:flex;
   justify-content:space-around;
+  flex-wrap:wrap;
 }
 .btn{
   width:60px;
@@ -39,9 +40,11 @@ canvas{
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:24px;
+  font-size:22px;
   user-select:none;
+  margin:4px;
 }
+.small{width:50px;height:50px;font-size:14px;}
 </style>
 </head>
 <body>
@@ -53,52 +56,60 @@ canvas{
   <div class="btn" id="rotate">⟳</div>
   <div class="btn" id="right">▶</div>
   <div class="btn" id="down">▼</div>
+  <div class="btn small" id="pause">⏸</div>
+  <div class="btn small" id="restart">⟲</div>
 </div>
 
 <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 
 // ---------- CANVAS ----------
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const COLS = 10, ROWS = 20, BLOCK = 24;
-canvas.width = COLS * BLOCK;
-canvas.height = ROWS * BLOCK;
+const COLS=10, ROWS=20, BLOCK=24;
+canvas.width = COLS*BLOCK;
+canvas.height = ROWS*BLOCK;
 
 // ---------- AUDIO ----------
-let audioCtx, musicOsc, musicGain;
-function beep(freq, dur){
-  if(!audioCtx) audioCtx = new (window.AudioContext||webkitAudioContext)();
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type="square";
-  o.frequency.value=freq;
+let audioCtx, musicOsc, musicGain, musicTimer;
+function beep(f,d){
+  if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type="square"; o.frequency.value=f;
   o.connect(g); g.connect(audioCtx.destination);
   o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
-  o.stop(audioCtx.currentTime+dur);
+  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d);
+  o.stop(audioCtx.currentTime+d);
 }
 
+// NES benzeri basit melodi
+const melody=[659,494,523,587,523,494,440];
+let note=0;
 function startMusic(){
-  if(!audioCtx) audioCtx = new (window.AudioContext||webkitAudioContext)();
+  if(!audioCtx) audioCtx=new (window.AudioContext||webkitAudioContext)();
   if(musicOsc) return;
-  musicOsc = audioCtx.createOscillator();
-  musicGain = audioCtx.createGain();
+  musicOsc=audioCtx.createOscillator();
+  musicGain=audioCtx.createGain();
   musicOsc.type="square";
-  musicGain.gain.value=0.025;
+  musicGain.gain.value=0.03;
   musicOsc.connect(musicGain);
   musicGain.connect(audioCtx.destination);
   musicOsc.start();
-  setInterval(()=>{
-    musicOsc.frequency.value = Math.random()>0.5 ? 220 : 330;
+  musicTimer=setInterval(()=>{
+    musicOsc.frequency.value=melody[note++%melody.length];
   },300);
 }
+function stopMusic(){
+  if(musicOsc){musicOsc.stop(); musicOsc=null;}
+  clearInterval(musicTimer);
+}
 
-// ---------- GAME ----------
+// ---------- GAME STATE ----------
 let grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
-let score = 0, high = localStorage.high||0, gameOver=false;
+let score=0, lines=0, level=1;
+let high=localStorage.high||0;
+let paused=false, gameOver=false;
 
 const PIECES=[
   {s:[[1,1,1,1]],c:"cyan"},
@@ -111,30 +122,48 @@ const PIECES=[
 ];
 
 function newPiece(){
-  const p = PIECES[Math.floor(Math.random()*PIECES.length)];
+  const p=PIECES[Math.floor(Math.random()*PIECES.length)];
   return {x:3,y:0,shape:p.s,color:p.c};
 }
 
-let cur = newPiece(), next = newPiece();
-let dropCounter=0, dropInterval=500, last=0;
+let cur=newPiece(), next=newPiece();
+let dropCounter=0, dropInterval=700, last=0;
 
 // ---------- DRAW ----------
-function drawBlock(x,y,c){
+function drawBlock(x,y,c,alpha=1){
+  ctx.globalAlpha=alpha;
   ctx.fillStyle=c;
   ctx.fillRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
   ctx.strokeStyle="#111";
   ctx.strokeRect(x*BLOCK,y*BLOCK,BLOCK,BLOCK);
+  ctx.globalAlpha=1;
+}
+
+function ghostY(){
+  let y=cur.y;
+  while(!collide({...cur,y:y+1})) y++;
+  return y;
 }
 
 function draw(){
   ctx.fillStyle="#111";
   ctx.fillRect(0,0,canvas.width,canvas.height);
+
   grid.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(x,y,v)));
+
+  // Ghost piece
+  const gy=ghostY();
+  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,gy+y,cur.color,0.3)));
+
+  // Active piece
   cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,cur.y+y,cur.color)));
+
   ctx.fillStyle="#fff";
-  ctx.fillText("SKOR: "+score,10,20);
-  ctx.fillText("REKOR: "+high,10,40);
-  if(gameOver) ctx.fillText("GAME OVER",10,70);
+  ctx.fillText(`SKOR: ${score}`,10,20);
+  ctx.fillText(`SEVİYE: ${level}`,10,40);
+  ctx.fillText(`REKOR: ${high}`,10,60);
+  if(paused) ctx.fillText("PAUSE",10,90);
+  if(gameOver) ctx.fillText("GAME OVER",10,90);
 }
 
 // ---------- LOGIC ----------
@@ -154,7 +183,7 @@ function merge(){
 }
 
 function rotate(){
-  const old = cur.shape;
+  const old=cur.shape;
   const rows=old.length, cols=old[0].length;
   let res=[];
   for(let c=0;c<cols;c++){
@@ -167,16 +196,19 @@ function rotate(){
 }
 
 function clearLines(){
-  let lines=0;
+  let cleared=0;
   for(let y=ROWS-1;y>=0;y--){
     if(grid[y].every(v=>v)){
       grid.splice(y,1);
       grid.unshift(Array(COLS).fill(0));
-      lines++; y++;
+      cleared++; y++;
     }
   }
-  if(lines){
-    score+=lines*10;
+  if(cleared){
+    lines+=cleared;
+    score+=cleared*10*level;
+    level=1+Math.floor(lines/10);
+    dropInterval=Math.max(150,700-level*70);
     high=Math.max(high,score);
     localStorage.high=high;
     beep(500,0.1);
@@ -196,25 +228,27 @@ function drop(){
 }
 
 // ---------- CONTROLS ----------
-["left","right","down","rotate"].forEach(id=>{
+["left","right","down","rotate","pause","restart"].forEach(id=>{
   document.getElementById(id).ontouchstart=()=>{
     audioCtx?.resume();
     startMusic();
-    if(id==="left") cur.x--;
-    if(id==="right") cur.x++;
+    if(id==="left"){cur.x--; if(collide(cur)) cur.x++;}
+    if(id==="right"){cur.x++; if(collide(cur)) cur.x--;}
     if(id==="down") drop();
     if(id==="rotate") rotate();
-    if(collide(cur)&&id!=="rotate") cur.x += id==="left"?1:-1;
+    if(id==="pause"){paused=!paused; paused?stopMusic():startMusic();}
+    if(id==="restart") location.reload();
   };
 });
 
 // ---------- LOOP ----------
 function update(t=0){
+  if(paused||gameOver){draw(); requestAnimationFrame(update); return;}
   let d=t-last; last=t;
   dropCounter+=d;
   if(dropCounter>dropInterval){drop(); dropCounter=0;}
   draw();
-  if(!gameOver) requestAnimationFrame(update);
+  requestAnimationFrame(update);
 }
 
 update();

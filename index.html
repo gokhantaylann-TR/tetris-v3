@@ -19,10 +19,10 @@ html,body{
   height:100vh;
 }
 
-/* ---- CLASSIC FRAME ---- */
+/* FRAME */
 #frame{
   margin-top:12px;
-  padding:14px 18px 18px 18px;
+  padding:14px 18px 18px;
   background:#bcbcbc;
   border:4px solid #555;
   border-radius:6px;
@@ -30,28 +30,20 @@ html,body{
     inset 4px 4px 0 #e5e5e5,
     inset -4px -4px 0 #8a8a8a,
     0 10px 20px rgba(0,0,0,.6);
-  position:relative;
-  width:fit-content;
 }
 
-/* ---- TOP HUD ---- */
+/* HUD */
 #hud{
   display:flex;
   justify-content:space-between;
-  align-items:center;
   margin-bottom:6px;
-  padding:0 2px;
   color:#ffd800;
   text-shadow:0 0 6px #ffd800;
   font-size:12px;
 }
+#credits{text-align:right}
 
-#credits{
-  text-align:right;
-  line-height:1.1;
-}
-
-/* ---- CANVAS ---- */
+/* CANVAS */
 canvas{
   display:block;
   background:#000;
@@ -59,7 +51,7 @@ canvas{
   border:3px solid #222;
 }
 
-/* ---- CONTROLS ---- */
+/* CONTROLS */
 #controls{
   width:100%;
   max-width:420px;
@@ -67,7 +59,6 @@ canvas{
   display:flex;
   justify-content:space-between;
   padding:0 16px;
-  box-sizing:border-box;
 }
 
 #leftControls{
@@ -95,52 +86,36 @@ canvas{
   justify-content:center;
   font-size:22px;
   user-select:none;
-  box-shadow:
-    inset 2px 2px 0 #999,
-    inset -2px -2px 0 #444;
+  box-shadow:inset 2px 2px 0 #999,inset -2px -2px 0 #444;
 }
-.small{
-  width:52px;
-  height:52px;
-  font-size:16px;
-}
+.small{width:52px;height:52px;font-size:16px}
 </style>
 </head>
 
 <body>
 
 <div id="frame">
-
-  <!-- HUD -->
   <div id="hud">
-    <div id="scoreText">SKOR 0</div>
-    <div id="credits">
-      MAT GAMES<br>
-      by gokhantaylan
-    </div>
+    <div id="hudLeft">SKOR 0<br>LEVEL 1</div>
+    <div id="credits">MAT GAMES<br>by gokhantaylan</div>
   </div>
-
   <canvas id="game"></canvas>
 </div>
 
 <div id="controls">
-
   <div id="leftControls">
     <div class="empty"></div>
     <div class="btn" id="rotate">⟳</div>
     <div class="empty"></div>
-
     <div class="btn" id="left">◀</div>
     <div class="btn" id="down">▼</div>
     <div class="btn" id="right">▶</div>
   </div>
-
   <div id="rightControls">
     <div class="btn small" id="pause">⏸</div>
     <div class="btn small" id="restart">⟲</div>
     <div class="btn small" id="music">🎵</div>
   </div>
-
 </div>
 
 <script>
@@ -150,10 +125,10 @@ const COLS=10, ROWS=20, BLOCK=24;
 canvas.width=COLS*BLOCK;
 canvas.height=ROWS*BLOCK;
 
-const scoreText=document.getElementById("scoreText");
+const hudLeft=document.getElementById("hudLeft");
 
-/* ---- AUDIO ---- */
-let audioCtx, musicOsc, musicTimer, musicOn=true;
+/* AUDIO */
+let audioCtx,musicOsc,musicTimer,musicOn=true;
 const melody=[659,494,523,587,523,494,440];
 let noteIndex=0;
 
@@ -166,26 +141,24 @@ function beep(f,d){
   g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+d);
   o.stop(audioCtx.currentTime+d);
 }
-
 function startMusic(){
   if(!musicOn||musicOsc) return;
   audioCtx ??= new AudioContext();
   musicOsc=audioCtx.createOscillator();
   const g=audioCtx.createGain();
-  musicOsc.type="square";
   g.gain.value=.03;
+  musicOsc.type="square";
   musicOsc.connect(g); g.connect(audioCtx.destination);
   musicOsc.start();
   musicTimer=setInterval(()=>musicOsc.frequency.value=melody[noteIndex++%melody.length],300);
 }
-function stopMusic(){
-  musicOsc?.stop();
-  musicOsc=null;
-  clearInterval(musicTimer);
-}
+function stopMusic(){musicOsc?.stop(); musicOsc=null; clearInterval(musicTimer)}
 
-/* ---- GAME ---- */
-let grid,cur,next,score,paused=false;
+/* GAME */
+let grid,cur,next,score,lines,level;
+let dropCounter=0, dropInterval=700, lastTime=0;
+let paused=false;
+
 const PIECES=[
  {s:[[1,1,1,1]],c:"cyan"},
  {s:[[2,2],[2,2]],c:"yellow"},
@@ -204,17 +177,64 @@ function newPiece(){
 function reset(){
  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
  cur=newPiece(); next=newPiece();
- score=0;
- scoreText.textContent="SKOR 0";
+ score=0; lines=0; level=1;
+ dropInterval=700;
+ updateHUD();
 }
-reset();
+function updateHUD(){
+ hudLeft.innerHTML=`SKOR ${score}<br>LEVEL ${level}`;
+}
 
 function collide(p){
  return p.shape.some((r,y)=>r.some((v,x)=>{
   if(!v) return false;
-  let nx=p.x+x, ny=p.y+y;
+  const nx=p.x+x, ny=p.y+y;
   return ny>=ROWS||nx<0||nx>=COLS||grid[ny][nx];
  }));
+}
+
+function merge(){
+ cur.shape.forEach((r,y)=>r.forEach((v,x)=>{
+  if(v) grid[cur.y+y][cur.x+x]=cur.color;
+ }));
+}
+
+function clearLines(){
+ let cleared=0;
+ for(let y=ROWS-1;y>=0;y--){
+  if(grid[y].every(v=>v)){
+   grid.splice(y,1);
+   grid.unshift(Array(COLS).fill(0));
+   cleared++; y++;
+  }
+ }
+ if(cleared){
+  lines+=cleared;
+  score+=cleared*10*level;
+  level=1+Math.floor(lines/10);
+  dropInterval=Math.max(150,700-level*70);
+  updateHUD();
+  beep(500,.1);
+ }
+}
+
+function rotate(){
+ const o=cur.shape;
+ cur.shape=o[0].map((_,i)=>o.map(r=>r[i]).reverse());
+ if(collide(cur)) cur.shape=o;
+ else beep(700,.05);
+}
+
+function drop(){
+ cur.y++;
+ if(collide(cur)){
+  cur.y--;
+  merge();
+  clearLines();
+  beep(300,.05);
+  cur=next;
+  next=newPiece();
+ }
 }
 
 function drawBlock(x,y,c){
@@ -231,46 +251,36 @@ function draw(){
  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(cur.x+x,cur.y+y,cur.color)));
 }
 
-function drop(){
- cur.y++;
- if(collide(cur)){
-  cur.y--;
-  cur.shape.forEach((r,y)=>r.forEach((v,x)=>v&&(grid[cur.y+y][cur.x+x]=cur.color)));
-  score+=10;
-  scoreText.textContent="SKOR "+score;
-  beep(300,.05);
-  cur=next; next=newPiece();
- }
-}
-
-/* ---- INPUT ---- */
+/* INPUT */
 ["left","right","down","rotate","pause","restart","music"].forEach(id=>{
  document.getElementById(id).ontouchstart=()=>{
   audioCtx?.resume(); startMusic();
   if(id==="left"){cur.x--; if(collide(cur))cur.x++}
   if(id==="right"){cur.x++; if(collide(cur))cur.x--}
   if(id==="down") drop();
-  if(id==="rotate"){
-   const o=cur.shape;
-   cur.shape=o[0].map((_,i)=>o.map(r=>r[i]).reverse());
-   if(collide(cur)) cur.shape=o;
-  }
+  if(id==="rotate") rotate();
   if(id==="restart") reset();
   if(id==="pause"){paused=!paused; paused?stopMusic():startMusic()}
   if(id==="music"){musicOn=!musicOn; musicOn?startMusic():stopMusic()}
  };
 });
 
-/* ---- LOOP ---- */
-let last=0,dropT=0;
-function loop(t){
+/* LOOP */
+function loop(time=0){
+ const delta=time-lastTime;
+ lastTime=time;
  if(!paused){
-  dropT+=t-last;
-  if(dropT>700){drop(); dropT=0}
+  dropCounter+=delta;
+  if(dropCounter>dropInterval){
+   drop();
+   dropCounter=0;
+  }
  }
- last=t; draw();
+ draw();
  requestAnimationFrame(loop);
 }
+
+reset();
 loop();
 </script>
 

@@ -19,20 +19,53 @@ html,body{
   height:100vh;
 }
 
-/* FRAME */
+/* ---------- RGB NEON ANIMATION ---------- */
+@keyframes rgbGlow{
+  0%{
+    box-shadow:
+      inset 4px 4px 0 #e5e5e5,
+      inset -4px -4px 0 #8a8a8a,
+      0 0 12px #ff00ff,
+      0 0 24px #ff00ff,
+      0 10px 20px rgba(0,0,0,.6);
+  }
+  33%{
+    box-shadow:
+      inset 4px 4px 0 #e5e5e5,
+      inset -4px -4px 0 #8a8a8a,
+      0 0 12px #00ffff,
+      0 0 24px #00ffff,
+      0 10px 20px rgba(0,0,0,.6);
+  }
+  66%{
+    box-shadow:
+      inset 4px 4px 0 #e5e5e5,
+      inset -4px -4px 0 #8a8a8a,
+      0 0 12px #00ff00,
+      0 0 24px #00ff00,
+      0 10px 20px rgba(0,0,0,.6);
+  }
+  100%{
+    box-shadow:
+      inset 4px 4px 0 #e5e5e5,
+      inset -4px -4px 0 #8a8a8a,
+      0 0 12px #ff00ff,
+      0 0 24px #ff00ff,
+      0 10px 20px rgba(0,0,0,.6);
+  }
+}
+
+/* ---------- FRAME ---------- */
 #frame{
   margin-top:12px;
   padding:14px 18px 18px;
   background:#bcbcbc;
   border:4px solid #555;
   border-radius:6px;
-  box-shadow:
-    inset 4px 4px 0 #e5e5e5,
-    inset -4px -4px 0 #8a8a8a,
-    0 10px 20px rgba(0,0,0,.6);
+  animation:rgbGlow 6s linear infinite;
 }
 
-/* HUD */
+/* ---------- HUD ---------- */
 #hud{
   display:flex;
   justify-content:space-between;
@@ -43,7 +76,7 @@ html,body{
 }
 #credits{text-align:right}
 
-/* CANVAS */
+/* ---------- CANVAS ---------- */
 canvas{
   display:block;
   background:#000;
@@ -51,7 +84,7 @@ canvas{
   border:3px solid #222;
 }
 
-/* CONTROLS */
+/* ---------- CONTROLS ---------- */
 #controls{
   width:100%;
   max-width:420px;
